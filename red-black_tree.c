@@ -1,14 +1,12 @@
-// AVL TREE: rotate right/left, successor, either store the balance factor in the struct or get the height
-
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include <stdbool.h>
-#include <assert.h>
 
 #define BLACK true
 #define RED false
 
-typedef struct node {
+typedef struct node{
     bool color;
     int datum;
     struct node *parent;
@@ -18,59 +16,70 @@ typedef struct node {
 
 void print (Node *tree);
 void clear (Node **tree);
-void insert (Node **tree, int datum);
-int insertBST (Node **tree, Node *new);
-void insertRepairTree (Node **tree, Node *new);
-void insertCase3 (Node **tree, Node *new);
-void insertCase4 (Node **tree, Node *node);
-void case4_2 (Node **tree, Node *node);
-void rotateLeft (Node *node, Node **tree);
-void rotateRight (Node *node, Node **tree);
-Node * getGrandparent (Node *node);
-Node * getSibling (Node *node);
+int insert (Node **tree, int datum);
+void insertBST (Node **tree, Node *node);
+bool isLeaf (Node *node);
+void insertRepairTree (Node *node);
 Node * getUncle (Node *node);
-short childType (Node *node);
-int delete (Node **tree, int value);
+Node * getSibling (Node *node);
+Node * getGrandparent (Node *node);
+void rotateRight (Node *node);
+void rotateLeft (Node *node);
+int delete (Node *root, int datum, Node **theTree);
+void deleteCase1 (Node *node);
+void deleteCase2 (Node *node);
+void deleteCase3 (Node *node);
+void deleteCase4 (Node *node);
+void deleteCase5 (Node *node);
+void deleteCase6 (Node *node);
 Node * successor (Node *node);
+void replace (Node *original, Node *replacement);
 
-Node tmp = {BLACK, 0, NULL, NULL, NULL}; // datum should really be NULL but there are annoying warnings otherwise
-Node *LEAF = &tmp;
-
-int main (void) 
+int main (void)
 {
     Node *tree = NULL;
 
-    insert(&tree, 6);
-    insert(&tree, 4);
-    insert(&tree, 9);
-    insert(&tree, 3);
-    insert(&tree, 4);
-    insert(&tree, 1);
-    insert(&tree, 10);
-    insert(&tree, 12);
-    insert(&tree, 13);
-    insert(&tree, 12);
-    insert(&tree, 9);
-    insert(&tree, 5);
-    insert(&tree, 8);
-    insert(&tree, 7);
-    insert(&tree, 9);
-    insert(&tree, 5);
+    insert(&tree, 41);
+	insert(&tree, 38);
+	insert(&tree, 31);
+	insert(&tree, 12);
+	insert(&tree, 19);
+	insert(&tree, 8);
 
-    print(tree);
-    printf("\n--------\n");
-
-    delete(&tree, 1);
-
-    print(tree);
+	print(tree);
     printf("\n-------\n");
 
-    delete(&tree, 8);
+	delete(tree, 8, &tree);
 
-    print(tree);
+	print(tree);
     printf("\n-------\n");
 
-	clear(&tree);
+	delete(tree, 12, &tree);
+
+	print(tree);
+    printf("\n-------\n");
+
+	delete(tree, 19, &tree);
+
+	print(tree);
+    printf("\n-------\n");
+
+	delete(tree, 31, &tree);
+
+	print(tree);
+    printf("\n-------\n");
+
+	delete(tree, 38, &tree);
+
+	print(tree);
+    printf("\n-------\n");
+
+	delete(tree, 41, &tree);
+
+    clear(&tree);
+
+	print(tree);
+    printf("\n-------\n");
 
     return 0;
 }
@@ -78,275 +87,373 @@ int main (void)
 void print (Node *tree)
 {
     static int depth = 0;
-    if (tree == NULL)
-    {
-        return;
-    }
+    if(!tree) return;
     ++depth;
     print(tree->right);
     --depth;
-    for (int i = 0; i < depth; ++i)
-    {
-        printf("  ");
-    }
-    if (tree->color == RED)
-    {
-        printf("\x1b[91m%d\x1b[0m\n", tree->datum); // set the print color to red, print, and reset the print color
-    }
-    else 
-    {
-        if (tree == LEAF) 
-        {
-            printf("NIL\n");
-        } 
-        else 
-        {
-            printf("%d\n", tree->datum);
-        }
-    }
+    for(int i = 0; i < depth; ++i)
+        printf("   ");
+    if(isLeaf(tree))
+        printf("NIL\n");
+    else if(tree->color == RED)
+        printf("\x1b[91m%d\x1b[0m\n",tree->datum);
+    else
+        printf("%d\n",tree->datum);
     ++depth;
     print(tree->left);
     --depth;
+    return;
 }
 
 void clear (Node **tree)
 {
-	if(*tree == LEAF) return;
-
-	clear(&((*tree)->left));
-	clear(&((*tree)->right));
-	free(*tree);
-	*tree = NULL;
+    if(!*tree) return;
+    clear(&((*tree)->left));
+    clear(&((*tree)->right));
+    free(*tree);
+    *tree = NULL;
+    return;
 }
 
-void insert (Node **tree, int datum)
+int insert (Node **tree, int datum)
 {
-    Node *new = malloc(sizeof(Node));
-    new->color = RED;
-    new->datum = datum;
-    new->parent = NULL;
-    new->left = LEAF;
-    new->right = LEAF;
+    Node *node = malloc(sizeof(Node));
 
-    insertBST(tree, new);
+	Node *leftNIL = malloc(sizeof(Node));
+    leftNIL->datum = 0;
+	leftNIL->parent = node;
+	leftNIL->left = NULL;
+	leftNIL->right = NULL;
+	leftNIL->color = BLACK;
 
-    insertRepairTree(tree, new);
-}
+	Node *rightNIL = malloc(sizeof(Node));
+	rightNIL->datum = 0;
+	rightNIL->parent = node;
+	rightNIL->left = NULL;
+	rightNIL->right = NULL;
+	rightNIL->color = BLACK;
+    node->color = RED;
+    node->datum = datum;
+    node->parent = NULL;
+    node->left = leftNIL;
+    node->right = rightNIL;
 
-int insertBST (Node **tree, Node *new)
-{
-	if (*tree == NULL)
-    {
-        (*tree) = new;
-        (*tree)->color = BLACK; // root is always black
-        return 0;
+    insertBST(tree, node);
+    insertRepairTree(node);
+
+    while(node->parent){
+        node = node->parent;
     }
-
-    if (new->datum < (*tree)->datum)
-    {
-        if ((*tree)->left != LEAF)
-        {
-            return 1 + insertBST(&((*tree)->left), new);
-        }
-        else
-        {
-            new->parent = (*tree);
-            (*tree)->left = new;
-        }
-    }
-    else
-    {
-		if ((*tree)->right != LEAF)
-        {
-            return 1 + insertBST(&((*tree)->right), new);
-        }
-        else
-        {
-            new->parent = (*tree);
-            (*tree)->right = new;
-        }
-    }
+    *tree = node;
 
     return 0;
 }
 
-void insertRepairTree (Node **tree, Node *new)
+void insertBST (Node **tree, Node *node)
 {
-    if (new->parent == NULL)
-    {
-        new->color = BLACK;
+    Node *treeCopy = *tree;
+    if (!treeCopy)
+	{
+        node->color = BLACK;
+        *tree = node;
         return;
     }
-    if (new->parent->color == BLACK)
-    {
+	/****LEFT****/
+    if (node->datum < treeCopy->datum)
+	{
+        if (isLeaf(treeCopy->left))
+		{
+            node->parent = treeCopy;
+            free(treeCopy->left);
+            treeCopy->left = node;
+            return;
+        }
+        insertBST(&(treeCopy->left), node);
         return;
     }
-    if (getUncle(new)->color == RED)
-    {
-        insertCase3(tree, new);
+	/****RIGHT****/
+    if (node->datum >= treeCopy->datum)
+	{
+        if (isLeaf(treeCopy->right))
+		{
+            node->parent = treeCopy;
+            free(treeCopy->right);
+            treeCopy->right = node;
+            return;
+        }
+        insertBST(&(treeCopy->right), node);
         return;
     }
-    else if (getUncle(new)->color == BLACK)
-    {
-        insertCase4(tree, new);
+    return;
+}
+
+bool isLeaf (Node *node)
+{
+	// only works because leaves are NIL
+    if (node->left == NULL)
+        return true;
+    return false;
+}
+
+void insertRepairTree (Node *node)
+{
+    if (node->parent == NULL && node->color == RED)
+	{
+        node->color = BLACK;
+        return;
     }
-}
-
-void insertCase3 (Node **tree, Node *node)
-{
-    Node *g = getGrandparent(node);
-    g->color = RED;
-    node->parent->color = BLACK;
-    getUncle(node)->color = BLACK;
-    insertRepairTree(tree, g);
-}
-
-void insertCase4 (Node **tree, Node *node)
-{
-    Node *p = node->parent;
-    Node *g = getGrandparent(node);
-
-    if (node == g->left->right)
-    {
-        rotateLeft(p, tree);
-        node = node->left;
+    if (node->parent && node->parent->parent)
+	{
+        if (node->parent->color == BLACK)
+            return;
+        if (getUncle(node)->color == RED)
+		{
+            node->parent->color = BLACK;
+            getUncle(node)->color = BLACK;
+            getGrandparent(node)->color = RED;
+            insertRepairTree(getGrandparent(node));
+            return;
+        }
+        if (getUncle(node)->color == BLACK)
+		{
+            if (getGrandparent(node)->left->right == node)
+			{
+                rotateLeft(node->parent);
+                node = node->left;
+            }
+            else if (getGrandparent(node)->right->left == node)
+			{
+                rotateRight(node->  parent);
+                node = node->right;
+            }
+            if(node->parent->left == node)
+                rotateRight(getGrandparent(node));
+            else
+                rotateLeft(getGrandparent(node));
+            node->parent->color = BLACK;
+            getSibling(node)->color = RED;
+        }
     }
-    else if (node == g->right->left)
-    {
-        rotateRight(p, tree);
-        node = node->right;
-    }
-
-    case4_2(tree, node);
-}
-
-void case4_2 (Node **tree, Node *node)
-{
-    Node *p = node->parent;
-    Node *g = getGrandparent(node);
-
-    if (node == p->left)
-    {
-        rotateRight(g, tree);
-    }
-    else
-        rotateLeft(g, tree);
-    p->color = BLACK;
-    g->color = RED;
-}
-
-void rotateLeft (Node *node, Node **tree)
-{
-    Node *right = node->right;
-    node->right = right->left;
-    if (node->right != NULL)
-        node->right->parent = node;
-    right->parent = node->parent;
-    if (node->parent == NULL)
-        *tree = right;
-    else if (node == node->parent->left)
-        node->parent->left = right;
-    else
-        node->parent->right = right;
-    right->left = node;
-    node->parent = right;
-}
-
-void rotateRight (Node *node, Node **tree)
-{
-    Node *left = node->left;
-    node->left = left->right;
-    if (node->left != NULL)
-        node->left->parent = node;
-    left->parent = node->parent;
-    if (node->parent == NULL)
-        *tree = left;
-    else if (node == node->parent->left)
-        node->parent->left = left;
-    else
-        node->parent->right = left;
-    left->right = node;
-    node->parent = left;
-}
-
-Node * getGrandparent (Node *node)
-{
-    if (node->parent)
-        return node->parent->parent;
-    return NULL;
-}
-
-Node * getSibling (Node *node)
-{
-    Node *p = node->parent;
-    if (!p)
-    {
-        return NULL;
-    }
-    if (p->left == node)
-    {
-        return p->right;
-    }
-    return p->left;
+    return;
 }
 
 Node * getUncle (Node *node)
 {
-    if (!node->parent)
-        return NULL;
+    if (node->parent == NULL) return NULL;
     return getSibling(node->parent);
 }
 
-short childType (Node *node) // -1 is left, 0 is root, 1 is right
+Node * getSibling (Node *node)
 {
-    if (node->parent == NULL) return 0;
-    if ((node->parent)->left == node) return -1;
-    return 1;
+    if (node->parent == NULL) return NULL;
+    if (node->parent->left == node)
+        return node->parent->right;
+    return node->parent->left;
 }
 
-int delete (Node **tree, int value)
+Node * getGrandparent (Node *node)
 {
-    Node *tmp = *tree;
-    if (tmp == LEAF) return 0;
-    if (value < tmp->datum)
-        return delete(&(tmp->left), value);
-    if (value > tmp->datum)
-        return delete(&(tmp->right), value);
-    if ((tmp->left == LEAF) != (tmp->right == LEAF)) // case 1: one and only one LEAF child
-    {
-        Node *child = tmp->left == LEAF ? tmp->right : tmp->left;
-        tmp->datum = child->datum;
-        tmp->parent = child->parent;
-        tmp->right = LEAF;
-        tmp->left = LEAF;
-        if (tmp->color == BLACK)
-        {
-            if (child->color == RED)
-                child->color = BLACK;
-            //else
-                // insert delete case 1 here
-        }
-        free(child);
+    if (node->parent == NULL) return NULL;
+    return node->parent->parent;
+}
+
+void rotateRight (Node *node)
+{
+    Node *pivot = node->left;
+    node->left = pivot->right;
+    node->left->parent = node;
+    pivot->right = node;
+    if(node->parent)
+	{
+        pivot->parent = node->parent;
+        if (pivot->parent->left == node)
+            pivot->parent->left = pivot;
+        else
+            pivot->parent->right = pivot;
     }
-    if (tmp->left == LEAF && tmp->right == LEAF) // case 2: two LEAF children
-    {
-		Node *parent = tmp->parent;
-        parent->left = LEAF;
-        parent->right = LEAF;
-        return 0;
-    }
-    if (tmp->left == NULL)
-        *tree = tmp->right;
     else
-        *tree = tmp->left;
-    free(tmp);
-    return 0;
+        pivot->parent = NULL;
+    node->parent = pivot;
+    return;
 }
 
-Node * successor (Node *node)
+void rotateLeft (Node *node)
 {
-    Node *cur = node->right;
-    while (cur->left != LEAF)
-        cur = cur->left;
-    return cur;
+    Node *pivot = node->right;
+    node->right = pivot->left;
+    node->right->parent = node;
+    pivot->left = node;
+    if (node->parent)
+	{
+        pivot->parent = node->parent;
+        if (pivot->parent->right == node)
+            pivot->parent->right = pivot;
+        else
+            pivot->parent->left = pivot;
+    }
+    else
+        pivot->parent = NULL;
+    node->parent = pivot;
+    return;
+}
+
+int delete (Node *root, int datum, Node **theTree)
+{
+    if (isLeaf(root)) return 0;
+    Node *curr = root;
+    if (curr->datum == datum)
+    {
+        if ((isLeaf(curr->left)) || (isLeaf(curr->right))) // one child
+        {
+            Node *child = (!isLeaf(curr->left)) ? curr->left : curr->right;
+            replace(curr, child);
+            if (curr->color == BLACK)
+            {
+                if (child->color == RED)
+                    child->color = BLACK;
+                else
+                    deleteCase1(child);
+            }
+            Node *tmp = child;
+            while (tmp->parent)
+                tmp = tmp->parent;
+            *theTree = tmp;
+            free(root);
+            return 0;
+        }
+        else // two children
+        {
+            Node *leftest = successor(curr);
+            curr->datum = leftest->datum;
+            return delete(leftest, curr->datum, theTree);
+        }
+    }
+    if (curr->datum > datum)
+        return delete(curr->left, datum, theTree);
+    return delete(curr->right, datum, theTree);
+}
+
+void deleteCase1 (Node *n)
+{
+    if (n->parent != NULL)
+        deleteCase2(n);
+}
+
+void deleteCase2 (Node *n)
+{
+    Node *s = getSibling(n);
+    Node *p = n->parent;
+
+    if (s->color == RED)
+    {
+        p->color = RED;
+        s->color = BLACK;
+        if (n == p->left)
+            rotateLeft(p);
+        else
+            rotateRight(p);
+    }
+    deleteCase3(n);
+}
+
+void deleteCase3 (Node *n)
+{
+    Node *s = getSibling(n);
+    Node *p = n->parent;
+
+    if ((p->color == BLACK)
+            && (s->color == BLACK)
+            && (s->left->color == BLACK)
+            && (s->right->color == BLACK))
+    {
+        s->color = RED;
+        if (p->parent != NULL) { deleteCase2(p); }
+    }
+    else
+        deleteCase4(n);
+}
+
+void deleteCase4 (Node *n)
+{
+    Node *s = getSibling(n);
+    Node *p = n->parent;
+
+    if ((p->color == RED)
+            && (s->color == BLACK)
+            && (s->left->color == BLACK)
+            && (s->right->color == BLACK))
+    {
+        s->color = RED;
+        p->color = BLACK;
+    }
+    else
+        deleteCase5(n);
+}
+
+void deleteCase5 (Node *n)
+{
+    Node *s = getSibling(n);
+    Node *p = n->parent;
+
+    if (s->color == BLACK)
+    {
+        if ((n == p->left)
+                && (s->right->color == BLACK)
+                && (s->left->color == RED))
+        {
+            s->color = RED;
+            s->left->color = BLACK;
+            rotateRight(s);
+        }
+        else if ((n == p->right)
+                && (s->left->color==BLACK)
+                && (s->right->color==RED))
+        {
+            s->color = RED;
+            s->right->color = BLACK;
+            rotateLeft(s);
+        }
+    }
+    deleteCase6(n);
+}
+
+void deleteCase6 (Node *n)
+{
+    Node *s = getSibling(n);
+    Node *p = n->parent;
+
+    s->color = p->color;
+    p->color = BLACK;
+
+    if (n == p->left)
+    {
+        s->right->color = BLACK;
+        rotateLeft(p);
+    }
+    else
+    {
+        s->left->color = BLACK;
+        rotateRight(p);
+    }
+}
+
+Node * successor(Node *node)
+{
+    Node *curr = node->right;
+    while (isLeaf(curr->left) == false)
+        curr = curr->left;
+    return curr;
+}
+
+void replace (Node *original, Node *replacement)
+{
+    Node *p = original->parent;
+    if (p)
+    {
+        if (p->left == original)
+            p->left = replacement;
+        else
+            p->right = replacement;
+    }
+    replacement->parent = p;
 }
